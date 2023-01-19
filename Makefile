@@ -13,6 +13,6 @@ gebco_xtrac.exe : gebco_xtrac.f90
 	$(F90)  gebco_xtrac.f90 -o gebco_xtrac.exe $(FFLAGS) 
 
 clean:
-	rm -f gebco_tool.exe
+	rm -f $(EXEC)
 
 
