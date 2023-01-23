@@ -21,7 +21,7 @@ PROGRAM gebco_tool
   INTEGER(KIND=4) :: npi,npj
   INTEGER(KIND=4) :: ncid, id, ierr
 
-  INTEGER(KIND=2), DIMENSION(:,:), ALLOCATABLE :: ielev, imask, ielevcor
+  INTEGER(KIND=2), DIMENSION(:,:), ALLOCATABLE :: ielev, imask, ielevcor,ifail
 
   REAL(KIND=8)   :: dresol=15 ! in second of arc
   REAL(KIND=8)   :: dlonmin, dlonmax, dlatmin,dlatmax
@@ -47,25 +47,25 @@ PROGRAM gebco_tool
   dlatmin=45.2 ; dlatmax=46.4
   czon='East-Azov'
 
-  dlonmin=-20 ; dlonmax=50
-  dlatmin=30 ; dlatmax=50
-  czon='zone1'
+! dlonmin=-20 ; dlonmax=50
+! dlatmin=30 ; dlatmax=50
+! czon='zone1'
 
-  dlonmin=-80 ; dlonmax=-55
-  dlatmin=5 ; dlatmax=30
-  czon='caribe'
+ dlonmin=-80 ; dlonmax=-55
+ dlatmin=5 ; dlatmax=30
+ czon='caribe'
 
-  dlonmin=-105 ; dlonmax=-70
-  dlatmin=5 ; dlatmax=40
-  czon='GOM'
+ dlonmin=-105 ; dlonmax=-70
+ dlatmin=5 ; dlatmax=40
+ czon='GOM'
 
-  dlonmin=-82.2 ; dlonmax=-72.3
-  dlatmin=23.1 ; dlatmax=27.3
-  czon='Bahamas'
+! dlonmin=-82.2 ; dlonmax=-72.3
+! dlatmin=23.1 ; dlatmax=27.3
+! czon='Bahamas'
 
-  dlonmin=42.5 ; dlonmax=62.0
-  dlatmin=-26.5 ; dlatmax=-2.0
-  czon='Seychelles'
+! dlonmin=42.5 ; dlonmax=62.0
+! dlatmin=-26.5 ; dlatmax=-2.0
+! czon='Seychelles'
 
   CALL getsize(cf_bathy,npi,npj)
   ALLOCATE ( dl_lon(npi), dl_lat(npj) ) 
@@ -80,6 +80,10 @@ PROGRAM gebco_tool
 
   ielevcor=-ielev*imask
   CALL geb_wri(czon,cv_bathy,ielevcor)
+  ifail=1
+  WHERE (ielevcor < 0  ) ifail = 0
+  czon=TRIM(czon)//'_fail'
+  CALL geb_wri(czon,cv_bathy,ifail)
 
 CONTAINS
 
@@ -139,6 +143,7 @@ SUBROUTINE getlonlat(cd_fil)
     ALLOCATE ( ielev(iimax-iimin+1, ijmax-ijmin+1) )
     ALLOCATE ( imask(iimax-iimin+1, ijmax-ijmin+1) )
     ALLOCATE ( ielevcor(iimax-iimin+1, ijmax-ijmin+1) )
+    ALLOCATE ( ifail(iimax-iimin+1, ijmax-ijmin+1) )
 
  END SUBROUTINE getlonlat
 
@@ -179,20 +184,25 @@ SUBROUTINE getlonlat(cd_fil)
     CHARACTER(LEN=80), INTENT(in) :: cd_zon
     CHARACTER(LEN=80), INTENT(in) :: cd_vin
 
-    INTEGER(KIND=4)   :: ierr,ncid, id, idlon,idlat
-    INTEGER(KIND=4)   :: idvlon, idvlat
+    INTEGER(KIND=4)   :: ierr,ncid, id, idlon,idlat,idtim
+    INTEGER(KIND=4)   :: idvlon, idvlat,idvtim
     CHARACTER(LEN=80) :: cf_out
 
+    REAL(KIND=8), DIMENSION(1) :: dl_tim
+
     cf_out=TRIM(cd_zon)//'.nc'
+    dl_tim(1) = 0.d0
     ! Create file
     ierr = NF90_CREATE(cf_out,NF90_NETCDF4,ncid)
     ! Create dimensions
     ierr = NF90_DEF_DIM(ncid,clon,iimax-iimin+1,idlon)
     ierr = NF90_DEF_DIM(ncid,clat,ijmax-ijmin+1,idlat)
+    ierr = NF90_DEF_DIM(ncid,'time',NF90_UNLIMITED,idtim)
     ! Create Variable
     ierr = NF90_DEF_VAR(ncid, clon,     NF90_DOUBLE,(/idlon/),       idvlon, deflate_level=1)
     ierr = NF90_DEF_VAR(ncid, clat,     NF90_DOUBLE,(/idlat/),       idvlat, deflate_level=1)
-    ierr = NF90_DEF_VAR(ncid, cd_vin,   NF90_SHORT, (/idlon,idlat/), id,     deflate_level=1)
+    ierr = NF90_DEF_VAR(ncid, 'time',   NF90_DOUBLE,(/idtim/),       idvtim                 )
+    ierr = NF90_DEF_VAR(ncid, cd_vin,   NF90_SHORT, (/idlon,idlat,idtim/), id, deflate_level=1)
     ! Create Attibute
     ierr = NF90_PUT_ATT(ncid,id,'missing_value',0)
     ! later ...
@@ -200,6 +210,7 @@ SUBROUTINE getlonlat(cd_fil)
     ! put variables
     ierr = NF90_PUT_VAR(ncid, idvlon, dl_lon(iimin:iimax) )
     ierr = NF90_PUT_VAR(ncid, idvlat, dl_lat(ijmin:ijmax) )
+    ierr = NF90_PUT_VAR(ncid, idvtim, dl_tim(1) )
     ierr = NF90_PUT_VAR(ncid, id,     kelev               )
 
     ierr = NF90_CLOSE(ncid)
