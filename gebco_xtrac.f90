@@ -1,4 +1,4 @@
-PROGRAM gebco_tool
+PROGRAM gebco_xtrac
   !!======================================================================
   !!                     ***  PROGRAM  gebco_tool  ***
   !!=====================================================================
@@ -13,6 +13,7 @@ PROGRAM gebco_tool
   !!----------------------------------------------------------------------
   USE netcdf
   IMPLICIT NONE
+  INTEGER(KIND=4) :: narg, ijarg
   INTEGER(KIND=4) :: ji,jj, jblk  ! dummy loop index
   INTEGER(KIND=4) :: ij1,ij2
   INTEGER(KIND=4) :: iimin,iimax
@@ -28,6 +29,7 @@ PROGRAM gebco_tool
   REAL(KIND=8)   :: dlon0, dlat0
 
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: dl_lon, dl_lat
+  REAL(KIND=8)                            :: dl_sign=-1.0d0
 
   CHARACTER(LEN=80) :: cf_bathy='GEBCO_2022.nc'
   CHARACTER(LEN=80) :: cf_mask='OSM_land_to_gebco.nc'
@@ -36,36 +38,107 @@ PROGRAM gebco_tool
   CHARACTER(LEN=80) :: clon='lon'
   CHARACTER(LEN=80) :: clat='lat'
   CHARACTER(LEN=80) :: czon
+  CHARACTER(LEN=80) :: cldum
+
+  LOGICAL           :: lglobal    =.FALSE.
+  LOGICAL           :: lwij       =.FALSE.
+  LOGICAL           :: lwlonlat   =.FALSE.
   !!
   !!----------------------------------------------------------------------
   !! GEBCOTOOLS_1.0 , MEOM 2023
   !! Copyright (c) 2023, J.-M. Molines
   !! Software governed by the CeCILL licence (Licence/CDFTOOLSCeCILL.txt)
   !!----------------------------------------------------------------------
+  narg=iargc()
+  IF ( narg == 0 ) THEN
+     PRINT *,' usage :  gebco_xtrac.exe [-z PREDEF-zone ] [-g] [-wij imin imax jmin jmax]'
+     PRINT *,'                       [-wlonlat lonmin lonmax latmin latmax] [-nam NAME-zone]'
+     PRINT *,'                       [-b BATHY-file] [-neg]'
+     PRINT *,'      '
+     PRINT *,'     PURPOSE :'
+     PRINT *,'        Extract a rectangular zone from '//TRIM(cf_bathy)//' and '//TRIM(cf_mask)
+     PRINT *,'        For each extracted zone, this program produce 4 files :'
+     PRINT *,"           * <ZONE>.nc  : the extracted bathymetry"
+     PRINT *,"           * <ZONE>_mask.nc: the extracted OSM mask"
+     PRINT *,"           * <ZONE>_mask_corrected.nc: the extracted masked bathymetry"
+     PRINT *,"           * <ZONE>_mask_corrected_fail.nc:  the mask of land points falling "
+     PRINT *,"                    into the ocean."
+     PRINT *,"                    These latter points are errors in the data base. This file"
+     PRINT *,"                    will be used by sosie drowning procedure to fix the errors."
+     PRINT *,'      '
+     PRINT *,'     ARGUMENTS /OPTIONS:'
+     PRINT *,'        -z PREDEF-zone: give a name of a predefined extraction zone. '
+     PRINT *,'             Available so for : East-Azov  caribe GOM Bahamas Seychelles Brest'
+     PRINT *,'        -g  : take the global domain (huge files ! )'
+     PRINT *,'        -wij imin imax jmin jmax : specify an extration windows using I-J index'
+     PRINT *,'        -wlonlat lonmin lonmax latmin latmax : specify an extration windows '
+     PRINT *,'             using longitude and latitudes. Longitudes are between -180 and 180.'
+     PRINT *,'        -nam NAME-zone : give a name for the extracted region (used for '
+     PRINT *,'             defining output file names.'
+     PRINT *,'        -b BATHY-file : use BATHY-file instead of '//TRIM(cf_bathy)
+     PRINT *,'        -neg : do not change sign of bathymetry'
+     PRINT *,'      '
+     PRINT *,'      '
+     PRINT *,'     SEE ALSO :'
+     PRINT *,'      '
+     PRINT *,'      '
+     STOP
+  ENDIF
 
-  dlonmin=33.2 ; dlonmax=36.2
-  dlatmin=45.2 ; dlatmax=46.4
-  czon='East-Azov'
+  ijarg = 1 
+  DO WHILE ( ijarg <= narg )
+     CALL getarg(ijarg, cldum ) ; ijarg=ijarg+1
+     SELECT CASE ( cldum )
+     CASE ( '-z'   ) ; CALL getarg(ijarg, czon ) ; ijarg=ijarg+1
+        lwlonlat = .TRUE.
+        SELECT CASE( czon)
+        CASE ( 'East-Azov')
+           dlonmin=33.2 ; dlonmax=36.2
+           dlatmin=45.2 ; dlatmax=46.4
+        CASE ( 'caribe')
+           dlonmin=-80 ; dlonmax=-55
+           dlatmin=5 ; dlatmax=30
+        CASE ( 'GOM')
+           dlonmin=-105 ; dlonmax=-70
+           dlatmin=5 ; dlatmax=40
+        CASE ( 'Bahamas')
+           dlonmin=-82.2 ; dlonmax=-72.3
+           dlatmin=23.1 ; dlatmax=27.3
+        CASE ( 'Seychelles')
+           dlonmin=42.5 ; dlonmax=62.0
+           dlatmin=-26.5 ; dlatmax=-2.0
+        CASE ( 'Brest')
+           dlonmin=-5.19 ; dlonmax=-3.79
+           dlatmin=47.68 ; dlatmax=48.73
+        CASE DEFAULT 
+           PRINT *, TRIM(czon),' NOT A PREDEFINED ZONE !'
+           STOP
+        END SELECT
+     CASE ( '-g' )
+        lglobal= .TRUE.
+        lwij   = .TRUE.
+     CASE ( '-wij'     ) ; lwij   = .TRUE.
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) iimin
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) iimax
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) ijmin
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) ijmax
+     CASE ( '-wlonlat' ) ; lwlonlat = .TRUE.
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) dlonmin
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) dlonmax
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) dlatmin
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) dlatmax
+                         ; PRINT *, dlonmin, dlonmax, dlatmin, dlatmax
+     CASE ( '-nam'     ) ; CALL getarg(ijarg,czon ) ; ijarg=ijarg+1
+     CASE ( '-b'       ) ; CALL getarg(ijarg,cf_bathy ) ; ijarg=ijarg+1
+     CASE ( '-neg'     ) ; dl_sign=1.0d0
+           
+        ! option
+     CASE DEFAULT    ; PRINT *, ' ERROR : ', TRIM(cldum),' : unknown option.'; STOP 1
+     END SELECT
+  ENDDO
 
-! dlonmin=-20 ; dlonmax=50
-! dlatmin=30 ; dlatmax=50
-! czon='zone1'
 
- dlonmin=-80 ; dlonmax=-55
- dlatmin=5 ; dlatmax=30
- czon='caribe'
 
- dlonmin=-105 ; dlonmax=-70
- dlatmin=5 ; dlatmax=40
- czon='GOM'
-
-! dlonmin=-82.2 ; dlonmax=-72.3
-! dlatmin=23.1 ; dlatmax=27.3
-! czon='Bahamas'
-
-! dlonmin=42.5 ; dlonmax=62.0
-! dlatmin=-26.5 ; dlatmax=-2.0
-! czon='Seychelles'
 
   CALL getsize(cf_bathy,npi,npj)
   ALLOCATE ( dl_lon(npi), dl_lat(npj) ) 
@@ -78,7 +151,7 @@ PROGRAM gebco_tool
   WHERE (imask == -1) imask=1
   czon=TRIM(czon)//'_corrected'
 
-  ielevcor=-ielev*imask
+  ielevcor=dl_sign*ielev*imask
   CALL geb_wri(czon,cv_bathy,ielevcor)
   ifail=1
   WHERE (ielevcor < 0  ) ifail = 0
@@ -107,6 +180,11 @@ CONTAINS
     PRINT *, '  LON = ', kpi
     PRINT *, '  LAT = ', kpj
     ierr = NF90_CLOSE(icid)
+    IF (lglobal) THEN
+       iimin=1 ; iimax=npi
+       ijmin=1 ; ijmax=npj
+    ENDIF
+      
 
  END SUBROUTINE getsize
 SUBROUTINE getlonlat(cd_fil)
@@ -131,15 +209,22 @@ SUBROUTINE getlonlat(cd_fil)
 
     dlon0=dl_lon(1)
     dlat0=dl_lat(1)
-    print *, dlon0, dlat0
-    print *, dlonmin-dlon0, dlatmin-dlat0
-
-    iimin=(dlonmin-dlon0)*60*60/dresol +1
-    iimax=(dlonmax-dlon0)*60*60/dresol +1
-    ijmin=(dlatmin-dlat0)*60*60/dresol +1
-    ijmax=(dlatmax-dlat0)*60*60/dresol +1
-
-    print *, iimin, iimax, ijmin, ijmax
+    IF ( lwij ) THEN
+       dlonmin = dl_lon(iimin)
+       dlonmax = dl_lon(iimax)
+       dlatmin = dl_lat(ijmin)
+       dlatmax = dl_lat(ijmax)
+       PRINT *, dlonmin, dlonmax, dlatmin, dlatmax
+    ELSE IF (lwlonlat) THEN
+       iimin=(dlonmin-dlon0)*60*60/dresol +1
+       iimax=(dlonmax-dlon0)*60*60/dresol +1
+       ijmin=(dlatmin-dlat0)*60*60/dresol +1
+       ijmax=(dlatmax-dlat0)*60*60/dresol +1
+       PRINT *, iimin, iimax, ijmin, ijmax
+    ELSE
+       PRINT *,' Weird ! lwij or lwlonlat shoudl be true ...'
+       STOP
+    ENDIF
     ALLOCATE ( ielev(iimax-iimin+1, ijmax-ijmin+1) )
     ALLOCATE ( imask(iimax-iimin+1, ijmax-ijmin+1) )
     ALLOCATE ( ielevcor(iimax-iimin+1, ijmax-ijmin+1) )
@@ -218,4 +303,4 @@ SUBROUTINE getlonlat(cd_fil)
 
  END SUBROUTINE geb_wri
   
-END PROGRAM gebco_tool
+END PROGRAM gebco_xtrac
