@@ -18,6 +18,7 @@ PROGRAM gebco_xtrac
   INTEGER(KIND=4) :: ij1,ij2
   INTEGER(KIND=4) :: iimin,iimax
   INTEGER(KIND=4) :: ijmin,ijmax
+  INTEGER(KIND=4) :: iiseed, ijseed
   INTEGER(KIND=4) :: iblksz=100
   INTEGER(KIND=4) :: npi,npj
   INTEGER(KIND=4) :: ncid, id, ierr
@@ -27,6 +28,7 @@ PROGRAM gebco_xtrac
   REAL(KIND=8)   :: dresol=15 ! in second of arc
   REAL(KIND=8)   :: dlonmin, dlonmax, dlatmin,dlatmax
   REAL(KIND=8)   :: dlon0, dlat0
+  REAL(KIND=8)   :: dlonseed, dlatseed
 
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: dl_lon, dl_lat
   REAL(KIND=8)                            :: dl_sign=-1.0d0
@@ -37,12 +39,13 @@ PROGRAM gebco_xtrac
   CHARACTER(LEN=80) :: cv_mask='Band1'
   CHARACTER(LEN=80) :: clon='lon'
   CHARACTER(LEN=80) :: clat='lat'
-  CHARACTER(LEN=80) :: czon
+  CHARACTER(LEN=80) :: czon, clzon
   CHARACTER(LEN=80) :: cldum
 
   LOGICAL           :: lglobal    =.FALSE.
   LOGICAL           :: lwij       =.FALSE.
   LOGICAL           :: lwlonlat   =.FALSE.
+  LOGICAL           :: lfill      =.FALSE.
   !!
   !!----------------------------------------------------------------------
   !! GEBCOTOOLS_1.0 , MEOM 2023
@@ -53,7 +56,7 @@ PROGRAM gebco_xtrac
   IF ( narg == 0 ) THEN
      PRINT *,' usage :  gebco_xtrac.exe [-z PREDEF-zone ] [-g] [-wij imin imax jmin jmax]'
      PRINT *,'                       [-wlonlat lonmin lonmax latmin latmax] [-nam NAME-zone]'
-     PRINT *,'                       [-b BATHY-file] [-neg]'
+     PRINT *,'                       [-b BATHY-file] [-neg] [-fill LON LAT]'
      PRINT *,'      '
      PRINT *,'     PURPOSE :'
      PRINT *,'        Extract a rectangular zone from '//TRIM(cf_bathy)//' and '//TRIM(cf_mask)
@@ -77,6 +80,7 @@ PROGRAM gebco_xtrac
      PRINT *,'             defining output file names.'
      PRINT *,'        -b BATHY-file : use BATHY-file instead of '//TRIM(cf_bathy)
      PRINT *,'        -neg : do not change sign of bathymetry'
+     PRINT *,'        -fill LON LAT: Apply a flood filling algorith, taking seed at LON LAT'
      PRINT *,'      '
      PRINT *,'      '
      PRINT *,'     SEE ALSO :'
@@ -131,7 +135,9 @@ PROGRAM gebco_xtrac
      CASE ( '-nam'     ) ; CALL getarg(ijarg,czon ) ; ijarg=ijarg+1
      CASE ( '-b'       ) ; CALL getarg(ijarg,cf_bathy ) ; ijarg=ijarg+1
      CASE ( '-neg'     ) ; dl_sign=1.0d0
-           
+     CASE ( '-fill'    ) ; lfill = .TRUE.
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) dlonseed
+                         ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) dlatseed
         ! option
      CASE DEFAULT    ; PRINT *, ' ERROR : ', TRIM(cldum),' : unknown option.'; STOP 1
      END SELECT
@@ -145,18 +151,29 @@ PROGRAM gebco_xtrac
   CALL getlonlat(cf_bathy)
 
   CALL xtrac (cf_bathy,cv_bathy,czon,ielev) 
-  czon=TRIM(czon)//'_mask'
-  CALL xtrac (cf_mask, cv_mask, czon,imask)
+  clzon=TRIM(czon)//'_mask'
+  CALL xtrac (cf_mask, cv_mask, clzon,imask)
   WHERE (imask == 1 ) imask=0
   WHERE (imask == -1) imask=1
-  czon=TRIM(czon)//'_corrected'
+  clzon=TRIM(czon)//'_corrected'
 
   ielevcor=dl_sign*ielev*imask
-  CALL geb_wri(czon,cv_bathy,ielevcor)
+  CALL geb_wri(clzon,cv_bathy,ielevcor)
+
   ifail=1
   WHERE (ielevcor < 0  ) ifail = 0
-  czon=TRIM(czon)//'_fail'
-  CALL geb_wri(czon,cv_bathy,ifail)
+  clzon=TRIM(czon)//'_fail'
+
+  CALL geb_wri(clzon,cv_bathy,ifail)
+
+  IF ( lfill ) THEN
+   PRINT *,' Flooding algorithm going on ... '
+   ifail=ielevcor
+   CALL FillPool2D(iiseed, ijseed,  ifail, -32768)
+   WHERE (ifail /= -32768) ielevcor=0
+   clzon=TRIM(czon)//'_flooded'
+   CALL geb_wri(clzon,cv_bathy,ielevcor)
+  ENDIF
 
 CONTAINS
 
@@ -214,6 +231,7 @@ SUBROUTINE getlonlat(cd_fil)
        dlonmax = dl_lon(iimax)
        dlatmin = dl_lat(ijmin)
        dlatmax = dl_lat(ijmax)
+       PRINT *, iimin, iimax, ijmin, ijmax
        PRINT *, dlonmin, dlonmax, dlatmin, dlatmax
     ELSE IF (lwlonlat) THEN
        iimin=(dlonmin-dlon0)*60*60/dresol +1
@@ -221,9 +239,16 @@ SUBROUTINE getlonlat(cd_fil)
        ijmin=(dlatmin-dlat0)*60*60/dresol +1
        ijmax=(dlatmax-dlat0)*60*60/dresol +1
        PRINT *, iimin, iimax, ijmin, ijmax
+       PRINT *, dlonmin, dlonmax, dlatmin, dlatmax
     ELSE
        PRINT *,' Weird ! lwij or lwlonlat shoudl be true ...'
        STOP
+    ENDIF
+    IF ( lfill ) THEN
+       iiseed=(dlonseed-dlonmin)*60*60/dresol +1
+       ijseed=(dlatseed-dlatmin)*60*60/dresol +1
+       PRINT *,' SEED LON-LAT :', dlonseed, dlatseed
+       PRINT *,' SEED I-J     :', iiseed, ijseed
     ENDIF
     ALLOCATE ( ielev(iimax-iimin+1, ijmax-ijmin+1) )
     ALLOCATE ( imask(iimax-iimin+1, ijmax-ijmin+1) )
@@ -303,4 +328,115 @@ SUBROUTINE getlonlat(cd_fil)
 
  END SUBROUTINE geb_wri
   
+  SUBROUTINE FillPool2D(kiseed, kjseed, kdta, kifill, ld_perio, ld_diagonal)
+    !!---------------------------------------------------------------------
+    !!                  ***  ROUTINE FillPool2D  ***
+    !!  
+    !! ** Purpose :  Replace all area surrounding by mask value by kifill value
+    !!  
+    !! ** Method  :  flood fill algorithm
+    !!  
+    !!----------------------------------------------------------------------
+    INTEGER(KIND=4),                 INTENT(in)    :: kiseed, kjseed
+    INTEGER(KIND=4),                 INTENT(in)    :: kifill         ! pool value
+    INTEGER(KIND=2), DIMENSION(:,:), INTENT(inout) :: kdta           ! mask
+    LOGICAL, OPTIONAL              , INTENT(in)    :: ld_perio       ! treat EW peridocity
+    LOGICAL, OPTIONAL              , INTENT(in)    :: ld_diagonal    ! extend search on diagonal
+
+    INTEGER :: ik                              ! number of point change
+    INTEGER :: ip                              ! size of the pile
+    INTEGER :: ji, jj                          ! loop index
+    INTEGER :: iip1, iim1, ii, ij, ijp1, ijm1  ! working integer
+    INTEGER :: ipiglo, ipjglo           ! size of the domain, infered from kdta size
+    LOGICAL :: lperio = .FALSE.
+    LOGICAL :: ldiag  = .FALSE.
+
+    INTEGER(KIND=4), DIMENSION(:,:), ALLOCATABLE :: ipile    ! pile variable
+    INTEGER(KIND=2), DIMENSION(:,:), ALLOCATABLE :: idata    ! new data
+    !!----------------------------------------------------------------------
+    IF ( PRESENT(ld_perio   )) lperio = ld_perio
+    IF ( PRESENT(ld_diagonal)) ldiag  = ld_diagonal
+    ! WARNING
+    IF (lperio) PRINT *, 'W A R N I N G: north fold not treated properly ...'
+
+    ! infer domain size from input array
+    ipiglo = SIZE(kdta,1)
+    ipjglo = SIZE(kdta,2)
+    print *, 'Infered size:', ipiglo, ipjglo
+
+    ! allocate variable
+    ALLOCATE(ipile(2*ipiglo*ipjglo,2))
+    ALLOCATE(idata(ipiglo,ipjglo))
+
+print *, 'at SEED position :',kdta(kiseed, kjseed)
+    ! initialise variables
+    idata=kdta
+!   idata(1     ,:     ) = 0
+!   idata(ipiglo,:     ) = 0
+!   idata(:     ,1     ) = 0
+!   idata(:     ,ipjglo) = 0
+    ipile(:,:)=0
+    ipile(1,:)=[kiseed,kjseed]
+    ip=1; ik=0
+
+    ! loop until the pile size is 0 or if the pool is larger than the critical size
+    DO WHILE ( ip /= 0 ) !  .AND. ik < 1000 );
+       ik=ik+1
+       ii=ipile(ip,1); ij=ipile(ip,2)
+       IF ( MOD(ik, 10000) == 0 ) PRINT *, 'IP =', ip, ik, ii,ij
+!      PRINT *, 'IP =', ip, ik, ii,ij
+
+       ! update bathy and update pile size
+       idata(ii,ij) =kifill
+       ipile(ip,:)  =[0,0]; ip=ip-1
+
+       ! check neighbour cells and update pile ( assume E-W periodicity )
+       IF ( lperio ) THEN
+          IF ( ii == ipiglo+1 ) ii=3
+          IF ( ii == 0        ) ii=ipiglo-2
+          iip1=ii+1; IF ( iip1 == ipiglo+1) iip1=3
+          iim1=ii-1; IF ( iim1 == 0       ) iim1=ipiglo-2
+       ELSE
+          IF ( ii == ipiglo+1 ) ii=ipiglo
+          IF ( ii == 0        ) ii=1
+          iip1=ii+1; IF ( iip1 == ipiglo+1) iip1=ipiglo
+          iim1=ii-1; IF ( iim1 == 0       ) iim1=1
+       END IF
+       ijp1=MIN(ij+1,ipjglo)  ! north fold not treated
+       ijm1=MAX(ij-1,1)
+
+       IF (idata(ii, ijp1) > 0 ) THEN
+          ip=ip+1; ipile(ip,:)=[ii  ,ijp1]
+       END IF
+       IF (idata(ii, ijm1) > 0 ) THEN
+          ip=ip+1; ipile(ip,:)=[ii  ,ijm1]
+       END IF
+       IF (idata(iip1, ij) > 0 ) THEN
+          ip=ip+1; ipile(ip,:)=[iip1,ij  ]
+       END IF
+       IF (idata(iim1, ij) > 0 ) THEN
+          ip=ip+1; ipile(ip,:)=[iim1,ij  ]
+       END IF
+
+       IF ( ldiag ) THEN
+          IF (idata(iim1, ijp1) > 0 ) THEN
+             ip=ip+1; ipile(ip,:)=[iim1,ijp1]
+          END IF
+          IF (idata(iim1, ijm1) > 0 ) THEN
+             ip=ip+1; ipile(ip,:)=[iim1,ijm1]
+          END IF
+          IF (idata(iip1, ijp1) > 0 ) THEN
+             ip=ip+1; ipile(ip,:)=[iip1,ijp1]
+          END IF
+          IF (idata(iip1, ijm1) > 0 ) THEN
+             ip=ip+1; ipile(ip,:)=[iip1,ijm1]
+          END IF
+       END IF
+
+    END DO
+    kdta=idata;
+
+    DEALLOCATE(ipile); DEALLOCATE(idata)
+
+  END SUBROUTINE FillPool2D
 END PROGRAM gebco_xtrac
