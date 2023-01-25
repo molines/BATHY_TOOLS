@@ -56,7 +56,7 @@ PROGRAM gebco_xtrac
   IF ( narg == 0 ) THEN
      PRINT *,' usage :  gebco_xtrac.exe [-z PREDEF-zone ] [-g] [-wij imin imax jmin jmax]'
      PRINT *,'                       [-wlonlat lonmin lonmax latmin latmax] [-nam NAME-zone]'
-     PRINT *,'                       [-b BATHY-file] [-neg] [-fill LON LAT]'
+     PRINT *,'                       [-b BATHY-file] [-m MASK-file] [-neg] [-fill LON LAT]'
      PRINT *,'      '
      PRINT *,'     PURPOSE :'
      PRINT *,'        Extract a rectangular zone from '//TRIM(cf_bathy)//' and '//TRIM(cf_mask)
@@ -134,6 +134,7 @@ PROGRAM gebco_xtrac
                          ; PRINT *, dlonmin, dlonmax, dlatmin, dlatmax
      CASE ( '-nam'     ) ; CALL getarg(ijarg,czon ) ; ijarg=ijarg+1
      CASE ( '-b'       ) ; CALL getarg(ijarg,cf_bathy ) ; ijarg=ijarg+1
+     CASE ( '-m'       ) ; CALL getarg(ijarg,cf_mask  ) ; ijarg=ijarg+1
      CASE ( '-neg'     ) ; dl_sign=1.0d0
      CASE ( '-fill'    ) ; lfill = .TRUE.
                          ; CALL getarg(ijarg,cldum) ; ijarg=ijarg+1 ; READ(cldum,*) dlonseed
@@ -271,14 +272,21 @@ SUBROUTINE getlonlat(cd_fil)
     CHARACTER(LEN=80), INTENT(in) :: cd_fin ! input file
     CHARACTER(LEN=80), INTENT(in) :: cd_vin ! input variable
     CHARACTER(LEN=80), INTENT(in) :: cd_zon ! zone name (for output file 
+
+    REAL(KIND=4),DIMENSION(:,:), ALLOCATABLE :: rdta
  !=====
+  ALLOCATE(rdta(iimax-iimin+1, ijmax-ijmin+1) )
   ierr = NF90_OPEN(cd_fin,NF90_NOWRITE,ncid)
 
   ierr = NF90_INQ_VARID(ncid, cd_vin, id) 
-  ierr = NF90_GET_VAR(ncid, id, kdta(:,:),start=(/iimin,ijmin/), count=(/iimax-iimin+1,ijmax-ijmin+1/) )
+  ierr = NF90_GET_VAR(ncid, id, rdta(:,:),start=(/iimin,ijmin/), count=(/iimax-iimin+1,ijmax-ijmin+1/) )
   ierr = NF90_CLOSE(ncid)
+  ! Data are read as REAL (for instance drowning procedure wite FLOAT) and converted to INT2
+  ! taking the nearest integer.
+  kdta=NINT(rdta)
 
   CALL geb_wri(cd_zon,cd_vin,kdta)
+  DEALLOCATE ( rdta)
  END SUBROUTINE xtrac
 
  SUBROUTINE geb_wri(cd_zon,cd_vin, kelev)
