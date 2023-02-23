@@ -72,6 +72,7 @@ PROGRAM gebco_xtrac
      PRINT *,'     ARGUMENTS /OPTIONS:'
      PRINT *,'        -z PREDEF-zone: give a name of a predefined extraction zone. '
      PRINT *,'             Available so for : East-Azov  caribe GOM Bahamas Seychelles Brest'
+     PRINT *,'             Malvinas'
      PRINT *,'        -g  : take the global domain (huge files ! )'
      PRINT *,'        -wij imin imax jmin jmax : specify an extration windows using I-J index'
      PRINT *,'        -wlonlat lonmin lonmax latmin latmax : specify an extration windows '
@@ -114,6 +115,9 @@ PROGRAM gebco_xtrac
         CASE ( 'Brest')
            dlonmin=-5.19 ; dlonmax=-3.79
            dlatmin=47.68 ; dlatmax=48.73
+        CASE ( 'Malvinas')
+           dlonmin=-61.8 ; dlonmax=-57.2
+           dlatmin=-53.2 ; dlatmax=-50.8
         CASE DEFAULT 
            PRINT *, TRIM(czon),' NOT A PREDEFINED ZONE !'
            STOP
