@@ -1,7 +1,8 @@
 #
 
 include make.macro
-EXEC= gebco_tool.exe gebco_xtrac.exe bedmachine_mask.exe bathy_correction.exe bedmachine_idraft.exe
+EXEC= gebco_tool.exe gebco_xtrac.exe bedmachine_mask.exe \
+     bathy_correction.exe bedmachine_idraft.exe file_merge.exe
 
 all: $(EXEC)
 
@@ -20,6 +21,9 @@ bedmachine_idraft.exe : bedmachine_idraft.f90
 
 bathy_correction.exe : bathy_correction.f90
 	$(F90)  bathy_correction.f90 -o bathy_correction.exe $(FFLAGS) 
+
+file_merge.exe : file_merge.f90
+	$(F90)  file_merge.f90 -o file_merge.exe $(FFLAGS) 
 
 clean:
 	rm -f $(EXEC) *~
