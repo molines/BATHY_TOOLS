@@ -201,8 +201,8 @@ PROGRAM file_merge_AA
      DEALLOCATE(rloc)
   ENDDO
   IF  (lneg ) rglo=-1.0*rglo
-  ! violent ... assume positive variable
-  WHERE ( rglo < 0 ) rglo = 0
+  ! violent ... assume positive variable (keep -9999.99 flag value )
+  WHERE ( rglo < 0 .AND. rglo > -8000 ) rglo = 0
   IF ( clcut == 'H' ) THEN
      ! case of AA, reset periodic condition:
      rglo(1     ,:) = rglo(npiglo-1,:)
