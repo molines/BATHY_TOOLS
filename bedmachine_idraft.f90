@@ -100,7 +100,8 @@ PROGRAM bedmachine_idraft
 
   mask_oce=0
   WHERE (mask == 0 .OR. mask == 3 ) mask_oce=1
-  rdraft=(rsurf - rthick) * mask_oce 
+  rdraft=(rsurf - rthick) * mask_oce  + rbed * ( 1 - mask_oce) 
+  !     isfd = (hsurf - hice) * msk + bed * (1 - msk)
   ! test =  rsurf - rthick -rbed 
 
   CALL WriteOutput( cf_out)
