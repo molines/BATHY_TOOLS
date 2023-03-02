@@ -49,7 +49,7 @@ PROGRAM solve_puzzle
   CHARACTER(LEN=255) :: cf_coor_40_aus = 'AUSTRAL36_coordinates_v3.3.nc'
   CHARACTER(LEN=255) :: cf_coor_40_gre = 'GREENLAND36_coordinates_v3.3.nc'
   ! Bathymetric files
-  CHARACTER(LEN=255) :: cf_bat_40     = 'eORCA_R36_Bathymetry_v4.0.nc'
+  CHARACTER(LEN=255) :: cf_bat_40     = 'eORCA_R36_Bathymetry_v4.0.2.nc'
   CHARACTER(LEN=255) :: cf_bat_42     = 'eORCA36_GEBCO_2022_PM-JMM_bathy_v2_4.2.nc'
   CHARACTER(LEN=255) :: cf_bat_40_pol = 'POLE36_GEBCO2022_Bathymetry_time_corrected.nc'
   CHARACTER(LEN=255) :: cf_bat_40_fol = 'FOLD36_GEBCO2022_Bathymetry_clean.nc'

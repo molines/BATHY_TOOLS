@@ -21,6 +21,7 @@ PROGRAM bedmachine_idraft
 
   REAL(KIND=4), DIMENSION(:,:), ALLOCATABLE :: rlon, rlat
   REAL(KIND=4), DIMENSION(:,:), ALLOCATABLE :: rbed,rsurf,rthick,rdraft
+  REAL(KIND=4)                              :: spval=-9999.99
 
   CHARACTER(LEN=80) :: cf_in
   CHARACTER(LEN=80) :: cf_out = 'bedmachine_ice_draf'
@@ -101,6 +102,7 @@ PROGRAM bedmachine_idraft
   mask_oce=0
   WHERE (mask == 0 .OR. mask == 3 ) mask_oce=1
   rdraft=(rsurf - rthick) * mask_oce  + rbed * ( 1 - mask_oce) 
+!  WHERE ( mask == 0 ) rdraft = 0
   !     isfd = (hsurf - hice) * msk + bed * (1 - msk)
   ! test =  rsurf - rthick -rbed 
 
@@ -130,6 +132,7 @@ PROGRAM bedmachine_idraft
     ierr = NF90_DEF_VAR(ncid,cv_lon ,NF90_FLOAT, (/idx,idy/) ,idlon, deflate_level=1,chunksizes=(/1,npjglo/10/) )
     ierr = NF90_DEF_VAR(ncid,cv_lat ,NF90_FLOAT, (/idx,idy/) ,idlat, deflate_level=1,chunksizes=(/1,npjglo/10/) )
     ierr = NF90_DEF_VAR(ncid,cv_draft,NF90_FLOAT, (/idx,idy/) ,id   , deflate_level=1,chunksizes=(/1,npjglo/10/) )
+    ierr = NF90_PUT_ATT(ncid,id,'missing_value',spval)
 
     ierr = NF90_ENDDEF(ncid)
     ierr = NF90_PUT_VAR( ncid, idlon, rlon)

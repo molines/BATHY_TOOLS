@@ -19,7 +19,7 @@ PROGRAM bedmachine_mask
   INTEGER(KIND=4) :: npiglo, npjglo
   INTEGER(KIND=4) :: ncid, id, ierr
 
-  INTEGER(KIND=4), DIMENSION(:,:), ALLOCATABLE :: mask_in, mask_out
+  INTEGER(KIND=4), DIMENSION(:,:), ALLOCATABLE :: mask_in, mask_out, mask_dra
 
   REAL(KIND=4), DIMENSION(:,:), ALLOCATABLE :: rlon, rlat
 
@@ -78,7 +78,7 @@ print *,NF90_STRERROR(ierr)
   ierr=NF90_INQ_DIMID( ncid, 'y', id) ; ierr = NF90_INQUIRE_DIMENSION(ncid,id,len=npjglo)
 print *,NF90_STRERROR(ierr)
 
-  ALLOCATE( mask_in(npiglo, npjglo), mask_out(npiglo, npjglo) )
+  ALLOCATE( mask_in(npiglo, npjglo), mask_out(npiglo, npjglo) , mask_dra(npiglo, npjglo))
   ALLOCATE( rlon(npiglo, npjglo), rlat(npiglo, npjglo) )
 
   ierr = NF90_INQ_VARID(ncid,cv_mask,id) ; ierr = NF90_GET_VAR(ncid,id,mask_in)
@@ -91,7 +91,9 @@ print *,NF90_STRERROR(ierr)
 print *,NF90_STRERROR(ierr)
 
   mask_out=0
-  WHERE (mask_in == 0 .OR. mask_in == 3 ) mask_out=1
+  mask_dra=0
+  WHERE (mask_in == 0 .OR. mask_in == 3 ) mask_out=1  ! Ocean and floating ice
+  WHERE (mask_in == 3 )                   mask_dra=1  ! where there is floating ice
 
   CALL WriteOutput( cf_out)
 
@@ -107,7 +109,7 @@ print *,NF90_STRERROR(ierr)
     !!----------------------------------------------------------------------
     CHARACTER(LEN=*), INTENT(in) :: cd_fout
 
-    INTEGER(KIND=4) :: ncid, id, idx,idy, ierr, idlon, idlat
+    INTEGER(KIND=4) :: ncid, id, idx,idy, ierr, idlon, idlat, iddra
 
     
     !!----------------------------------------------------------------------
@@ -119,11 +121,13 @@ print *,NF90_STRERROR(ierr)
     ierr = NF90_DEF_VAR(ncid,cv_lon ,NF90_FLOAT, (/idx,idy/) ,idlon, deflate_level=1,chunksizes=(/1,npjglo/10/) )
     ierr = NF90_DEF_VAR(ncid,cv_lat ,NF90_FLOAT, (/idx,idy/) ,idlat, deflate_level=1,chunksizes=(/1,npjglo/10/) )
     ierr = NF90_DEF_VAR(ncid,cv_mask,NF90_INT  , (/idx,idy/) ,id   , deflate_level=1,chunksizes=(/1,npjglo/10/) )
+    ierr = NF90_DEF_VAR(ncid,'isfmask',NF90_INT, (/idx,idy/) ,iddra, deflate_level=1,chunksizes=(/1,npjglo/10/) )
 
     ierr = NF90_ENDDEF(ncid)
     ierr = NF90_PUT_VAR( ncid, idlon, rlon)
     ierr = NF90_PUT_VAR( ncid, idlat, rlat)
     ierr = NF90_PUT_VAR( ncid, id   , mask_out )
+    ierr = NF90_PUT_VAR( ncid, iddra, mask_dra )
     ierr = NF90_CLOSE(ncid)
 
     END SUBROUTINE WriteOutput

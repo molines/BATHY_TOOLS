@@ -162,6 +162,8 @@ PROGRAM file_merge_AA
         PRINT *,' Cut direction :', TRIM (clcut)
         IF (ierr /= 0 ) STOP 
      ENDIF
+print *, "NPI NPJ" , jf, npi,npj
+
      ALLOCATE( rloc(npi,npj) )
      ierr= NF90_INQ_VARID(ncid,cv_in,id) ; ierr=NF90_GET_VAR(ncid,id,rloc)
      ierr=NF90_CLOSE(ncid)
