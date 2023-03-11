@@ -26,16 +26,18 @@ PROGRAM solve_puzzle
   !!----------------------------------------------------------------------
   USE netcdf
   IMPLICIT NONE
-  INTEGER(KIND=4) :: ji42, jj42, jigre, jjgre
+  INTEGER(KIND=4) :: ji42, jj42, jigre, jjgre, jj
   INTEGER(KIND=4) :: ncid, id, ierr
 
   INTEGER(KIND=4) :: npi40, npj40,  npi_pol,npj_pol,   npi_fol,npj_fol,   npi_gre,npj_gre
   INTEGER(KIND=4) :: npi42, npj42,  npi_aus,npj_aus
   INTEGER(KIND=4) :: npi,npj
-  INTEGER(KIND=4) :: ii40, ij40, iifol,ijfol,  iiloc, ijloc,  iiaus,ijaus,   iigre, ijgre
+  INTEGER(KIND=4) :: ii40, ij40, iifol,ijfol,  iiloc, ijloc,  iiaus,ijaus,   iigre, ijgre, iramp
+  INTEGER(KIND=4) :: ij0, ij1 
   INTEGER(KIND=4) :: ni40, nj40
   
 
+  REAL(KIND=4)                                :: ralpha
   REAL(KIND=4), DIMENSION(:,:),   ALLOCATABLE :: rbat40, rdra40
   REAL(KIND=4), DIMENSION(:,:),   ALLOCATABLE :: rbat42, rbat_pol, rbat_fol, rbat_gre, rbat_aus
   REAL(KIND=4), DIMENSION(:,:),   ALLOCATABLE :: rma_gre, rdra_gre
@@ -126,6 +128,7 @@ PROGRAM solve_puzzle
 
 ! Now patch the Antarctica j=1 --> j=3336
  iiloc=6000; ijloc=3336
+ iramp=100  ! size of the ramp to merge bedmachine with gebco
  ! check coherency :
  IF ( rco40(iiloc,ijloc,1) /= rco_aus(iiloc,ijloc,1) ) THEN
     PRINT *, 'PB in AUSTRAL GRID I'
@@ -140,7 +143,15 @@ PROGRAM solve_puzzle
  IF ( npi /= npi_aus .OR. npj /= npj_aus ) THEN
    PRINT *, 'dimension error in ',TRIM(cf_bat_40_aus)
  ENDIF
- rbat40(:,1:ijloc)=rbat_aus(:,1:ijloc)
+ 
+ ij0 = ijloc -iramp
+ ij1 = ijloc
+ rbat40(:,1:ij0)=rbat_aus(:,1:ij0) 
+ !now merge rbat40  with rbat_aus 
+ DO jj=ij0+1, ij1
+    ralpha=FLOAT(jj - ij0 )/FLOAT(iramp)
+    rbat40(:,jj) = ralpha* rbat40(:,jj) + (1. - ralpha ) * rbat_aus(:,jj)
+ ENDDO
 
  CALL GetBat(cf_dra_40_aus,'icedraft',rbat_aus,npi,npj)
  IF ( npi /= npi_aus .OR. npj /= npj_aus ) THEN
